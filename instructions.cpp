@@ -219,14 +219,11 @@ void CPU6502::executeInstruction() {
 
     //if (irqRequested && !getFlag(FLAG_INTERRUPT)) {
     if (irqRequested) {
-        printf("IRQ Requested\n");
-
         irqRequested = false;
         pushWord(regPC);
         pushByte(regP | FLAG_UNUSED);
         setFlag(FLAG_INTERRUPT, true);
         regPC = readWord(0xFFFE);
-        printf("IRQ vector = $%04X\n", regPC);
         totalCycles += 7;
         return;
     }

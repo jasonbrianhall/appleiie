@@ -25,7 +25,6 @@ gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer data) {
 
   if ((event->state & GDK_CONTROL_MASK) && (event->keyval == 'c' || event->keyval == 'C')) {
     g_cpu->requestIRQ();
-    printf("Requesting interrupt\n");
     return TRUE;
   }
 
@@ -194,7 +193,7 @@ public:
   void run(int argc, char *argv[]) {
     GtkWidget *window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
     gtk_window_set_title(GTK_WINDOW(window), "Apple II Emulator");
-    gtk_window_set_default_size(GTK_WINDOW(window), 320, 240);
+    gtk_window_set_default_size(GTK_WINDOW(window), 640, 480);
 
     GtkWidget *drawing_area = gtk_drawing_area_new();
     gtk_container_add(GTK_CONTAINER(window), drawing_area);
