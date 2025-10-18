@@ -44,20 +44,12 @@ public:
         0x0428, 0x04A8, 0x0528, 0x05A8, 0x0628, 0x06A8, 0x0728, 0x07A8,
         0x0450, 0x04D0, 0x0550, 0x05D0, 0x0650, 0x06D0, 0x0750, 0x07D0};
 
-    for (int row = 0; row < 16; ++row) {
+    for (int row = 0; row < 24; ++row) {
       uint16_t start = rowStarts[row];
       if (address >= start && address < start + 0x28) {
         return address - start; // Column is offset from row start
       }
     }
-    for (int row = 16; row < 23; ++row) {
-      uint16_t start = rowStarts[row];
-      if (address >= start && address < start + 0x28) {
-        printf("Returned address %i\n", address);
-        return address - start; // Column is offset from row start
-      }
-    }
-
 
     return -1; // Not a valid screen address
   }
