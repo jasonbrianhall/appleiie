@@ -96,12 +96,12 @@ public:
         textMemory[linearAddr] = displayChar;
 
         // Check if this write triggers a scroll (newline on last line)
-        if (displayChar>=97 && displayChar<=122) {
+        /*if (displayChar>=97 && displayChar<=122) {
             int row = getRowFromAddress(address);
             int col = getColumnFromAddress(address);
 
             printf("%i %i\n", row, col);
-        }
+        }*/
       }
     }
   }

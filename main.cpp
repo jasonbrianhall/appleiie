@@ -23,7 +23,12 @@ gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer data) {
   uint8_t key = 0;
   bool shouldInject = false;
 
-  // Handle special keys
+  if ((event->state & GDK_CONTROL_MASK) && (event->keyval == 'c' || event->keyval == 'C')) {
+    g_cpu->requestIRQ();
+    printf("Requesting interrupt\n");
+    return TRUE;
+  }
+
   if (event->keyval == GDK_KEY_Return) {
     key = '\r';
     shouldInject = true;

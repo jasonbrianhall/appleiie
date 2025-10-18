@@ -182,6 +182,56 @@ void CPU6502::executeInstruction() {
     uint8_t cycles = instructionCycles[opcode];
     totalCycles += cycles;
 
+    //if (nmiRequested) {printf("NMI\n"); nmiRequested=false;}
+    //if (irqRequested) {printf("IRQ\n"); irqRequested=false;}
+
+/*    if (nmiRequested) {
+        nmiRequested = false;
+        pushWord(regPC);
+        pushByte(regP | FLAG_UNUSED);
+        setFlag(FLAG_INTERRUPT, true);
+        regPC = readWord(0xFFFA);
+        totalCycles += 7;
+        return;
+    }
+
+    // Handle IRQ (only if interrupt flag is clear)
+    if (irqRequested && !getFlag(FLAG_INTERRUPT)) {
+        irqRequested = false;
+        pushWord(regPC);
+        pushByte(regP | FLAG_UNUSED);
+        setFlag(FLAG_INTERRUPT, true);
+        regPC = readWord(0xFFFE);
+        totalCycles += 7;
+        return;
+    }*/
+
+    if (nmiRequested) {
+        printf("NMI Requested\n");
+        nmiRequested = false;
+        pushWord(regPC);
+        pushByte(regP | FLAG_UNUSED);
+        setFlag(FLAG_INTERRUPT, true);
+        regPC = readWord(0xFFFA);
+        totalCycles += 7;
+        return;
+    }
+
+    //if (irqRequested && !getFlag(FLAG_INTERRUPT)) {
+    if (irqRequested) {
+        printf("IRQ Requested\n");
+
+        irqRequested = false;
+        pushWord(regPC);
+        pushByte(regP | FLAG_UNUSED);
+        setFlag(FLAG_INTERRUPT, true);
+        regPC = readWord(0xFFFE);
+        printf("IRQ vector = $%04X\n", regPC);
+        totalCycles += 7;
+        return;
+    }
+
+
     switch (opcode) {
     case 0x69: ADC(addrImmediate()); break; case 0x65: ADC(addrZeroPage()); break; case 0x75: ADC(addrZeroPageX()); break;
     case 0x6D: ADC(addrAbsolute()); break; case 0x7D: ADC(addrAbsoluteX()); break; case 0x79: ADC(addrAbsoluteY()); break;

@@ -16,6 +16,9 @@ public:
     AppleIIVideo* video;
     AppleIIKeyboard* keyboard;
 
+    bool irqRequested = false;
+    bool nmiRequested = false;
+
     enum StatusFlags {
         FLAG_CARRY = 0x01,
         FLAG_ZERO = 0x02,
@@ -128,6 +131,11 @@ public:
     void TYA();
 
     void executeInstruction();
+
+
+    void requestIRQ() { irqRequested = true; }
+    void requestNMI() { nmiRequested = true; }
+
 };
 
 #endif
