@@ -2,7 +2,6 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cmath>
-#include <algorithm>
 
 // GCR encoding: 4-bit value -> 8-bit GCR
 const uint8_t DiskII::GCR_ENCODING_TABLE[64] = {
@@ -87,57 +86,40 @@ bool DiskII::loadDisk(int drive, const std::string& filename) {
         return false;
     }
     
-    // Determine format by filename (case-insensitive)
-    std::string lowerFilename = filename;
-    std::transform(lowerFilename.begin(), lowerFilename.end(), lowerFilename.begin(), ::tolower);
-    bool isNib = (lowerFilename.find(".nib") != std::string::npos);
+    // Determine if DOS or ProDOS by filename
+    bool isDos33 = (filename.find(".dsk") != std::string::npos);
     
     // Read file size
     file.seekg(0, std::ios::end);
     size_t fileSize = file.tellg();
     file.seekg(0, std::ios::beg);
     
-    if (isNib) {
-        // .NIB file - read raw nibble data directly
-        int numTracks = fileSize / RAW_TRACK_BYTES;
-        if (numTracks > DOS_NUM_TRACKS) {
-            numTracks = DOS_NUM_TRACKS;
+    // Allocate storage for raw nibbles
+    // Each track is RAW_TRACK_BYTES, 35 tracks standard
+    int numTracks = DOS_NUM_TRACKS;
+    diskData[drive] = new uint8_t[numTracks * RAW_TRACK_BYTES];
+    diskTracks[drive] = numTracks;
+    
+    uint8_t track[DOS_TRACK_BYTES];
+    
+    // Read tracks and convert to nibbles
+    for (int trackNum = 0; trackNum < numTracks; trackNum++) {
+        if (file.read((char*)track, DOS_TRACK_BYTES).fail()) {
+            printf("Failed reading track %d\n", trackNum);
+            delete[] diskData[drive];
+            diskData[drive] = nullptr;
+            return false;
         }
         
-        diskData[drive] = new uint8_t[numTracks * RAW_TRACK_BYTES];
-        diskTracks[drive] = numTracks;
-        
-        file.read((char*)diskData[drive], numTracks * RAW_TRACK_BYTES);
-        
-        printf("Loaded .NIB disk drive %d: %d tracks\n", drive, numTracks);
-    } else {
-        // .DSK file - convert sectors to nibbles
-        bool isDos33 = (lowerFilename.find(".dsk") != std::string::npos);
-        
-        int numTracks = DOS_NUM_TRACKS;
-        diskData[drive] = new uint8_t[numTracks * RAW_TRACK_BYTES];
-        diskTracks[drive] = numTracks;
-        
-        uint8_t track[DOS_TRACK_BYTES];
-        
-        for (int trackNum = 0; trackNum < numTracks; trackNum++) {
-            if (file.read((char*)track, DOS_TRACK_BYTES).fail()) {
-                printf("Failed reading track %d\n", trackNum);
-                delete[] diskData[drive];
-                diskData[drive] = nullptr;
-                return false;
-            }
-            
-            uint8_t* nibblePtr = diskData[drive] + (trackNum * RAW_TRACK_BYTES);
-            trackToNibbles(track, nibblePtr, 254, trackNum, isDos33);
-        }
-        
-        printf("Loaded .DSK disk drive %d: %d tracks\n", drive, numTracks);
+        // Convert sector format to nibbles
+        uint8_t* nibblePtr = diskData[drive] + (trackNum * RAW_TRACK_BYTES);
+        trackToNibbles(track, nibblePtr, 254, trackNum, isDos33);
     }
     
     file.close();
-    writeProtected[drive] = true;
+    writeProtected[drive] = true;  // For now, always write-protected
     
+    printf("Loaded disk drive %d: %d tracks\n", drive, numTracks);
     return true;
 }
 
