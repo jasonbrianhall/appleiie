@@ -238,10 +238,11 @@ void DiskII::ioWrite(uint16_t address, uint8_t value) {
 uint8_t DiskII::readROM(uint16_t address) const {
     // PR#6 loads the Disk II controller ROM from $C600-$C6FF
     // Address should be in the range $C600-$C6FF
-    printf("Reading ROM %x\n", address);
     if (address >= ROM_BASE && address < ROM_BASE + ROM_SIZE) {
+        //printf("Returning ROM %x %x\n", address, DISK_BOOT_ROM[address - ROM_BASE]);
         return DISK_BOOT_ROM[address - ROM_BASE];
     }
+    printf("This should never happen\n");
     return 0x00;  // Default return if out of range
 }
 

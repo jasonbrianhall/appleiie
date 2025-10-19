@@ -35,8 +35,9 @@ uint8_t CPU6502::readByte(uint16_t address) {
     }
     
     // Disk II ROM ($C600-$C6FF) - broader range
-    if (address >= 0xC600 && address < 0xC700) {
-        //return diskController->readROM(address);
+    if ((address >= 0xC080 && address <= 0xC08F) || 
+        (address >= 0xC680 && address <= 0xC68F)) {
+        return diskController->ioRead(address);
     }
     
     // Video memory reads
@@ -56,7 +57,7 @@ uint8_t CPU6502::readByte(uint16_t address) {
         }
         
         // Disk controller I/O ($C0x0-$C0xF)
-        if (address >= 0xC680 && address <= 0xC68F) {
+        if ((address >= 0xC080 && address <= 0xC08F) || (address >= 0xC680 && address <= 0xC68F)) {
             printf("Writing bytes to Address %x %x\n", address, value);
 
             diskController->ioWrite(address, value);

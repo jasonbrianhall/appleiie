@@ -55,41 +55,15 @@ static uint16_t lastPC = 0;
 static int sameCount = 0;
 
 gboolean cpu_tick(gpointer data) {
-  GtkWidget *widget = (GtkWidget *)data;
-
   const uint64_t CYCLES_PER_TICK = 20000;
-
+  
   for (uint64_t i = 0; i < CYCLES_PER_TICK && g_running; i++) {
     g_cpu->executeInstruction();
-
-    if (g_cpu->ram[g_cpu->regPC] == 0x00) {
-      debugLog << "[BRK at $" << std::hex << g_cpu->regPC << std::dec << "]\n";
-      debugLog.flush();
-      g_running = false;
-      break;
-    }
   }
-
-  // Check if CPU is stuck
-  if (g_cpu->regPC == lastPC) {
-    sameCount++;
-    if (sameCount > 60) { // About 1 second at 60 FPS
-      debugLog << "CPU appears stuck at $" << std::hex << g_cpu->regPC
-               << std::dec << "\n";
-      debugLog << "  A=$" << std::hex << (int)g_cpu->regA << " X=$"
-               << (int)g_cpu->regX << " Y=$" << (int)g_cpu->regY << " SP=$"
-               << (int)g_cpu->regSP << std::dec << "\n";
-      debugLog.flush();
-      sameCount = 0;
-    }
-  } else {
-    sameCount = 0;
-  }
+  
   lastPC = g_cpu->regPC;
-
-  gtk_widget_queue_draw(widget);
-
-  // Keep running until CPU stops
+  gtk_widget_queue_draw((GtkWidget *)data);
+  
   return g_running ? TRUE : FALSE;
 }
 
