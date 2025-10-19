@@ -15,12 +15,19 @@ public:
     static const int DOS_TRACK_BYTES = 256 * DOS_NUM_SECTORS; // 4096
     static const int RAW_TRACK_BYTES = 0x1A00; // 6656 for .NIB
     
+    // Boot ROM address space (PR#6 loads from $C600-$C6FF)
+    static const uint16_t ROM_BASE = 0xC600;
+    static const uint16_t ROM_SIZE = 0x100;
+    
     // GCR encoding table (64 valid values)
     static const uint8_t GCR_ENCODING_TABLE[64];
     
     // DOS 3.3 logical sector ordering
     static const int GCR_LOGICAL_DOS33_SECTOR[16];
     static const int GCR_LOGICAL_PRODOS_SECTOR[16];
+    
+    // Boot ROM
+    static const uint8_t DISK_BOOT_ROM[256];
 
     DiskII();
     ~DiskII();
@@ -31,6 +38,9 @@ public:
     // I/O access
     uint8_t ioRead(uint16_t address);
     void ioWrite(uint16_t address, uint8_t value);
+    
+    // ROM access (for PR#6 - addresses $C600-$C6FF)
+    uint8_t readROM(uint16_t address) const;
     
     // Query disk state
     bool isMotorOn() const { return motorOn; }
