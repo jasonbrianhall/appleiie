@@ -25,12 +25,12 @@ A 6502 CPU emulator designed to run Apple II 2e firmware and BASIC programs. Thi
 ./build.sh
 ```
 
-This generates an executable `a.out`.
+This generates an executable `appleiie`.
 
 ## Usage
 
 ```bash
-./a.out <rom.bin> [basic_program.bin]
+./appleiie <rom.bin> [basic_program.bin]
 ```
 
 ### Arguments
