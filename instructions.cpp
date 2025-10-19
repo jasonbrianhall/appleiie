@@ -41,7 +41,8 @@ const uint8_t CPU6502::instructionCycles[256] = {
         }
         
         // Disk controller I/O ($C0x0-$C0xF)
-        if (address >= 0xC080 && address <= 0xC08F) {
+        if (address >= 0xC680 && address <= 0xC68F) {
+            printf("Reading bytes from Address %x\n", address);
             return diskController->ioRead(address);
         }
         
@@ -54,14 +55,7 @@ const uint8_t CPU6502::instructionCycles[256] = {
     }
 
    void CPU6502::writeByte(uint16_t address, uint8_t value) {
-        // Log only writes to the suspicious range
-        if (address >= 0x0580 && address < 0x0600) {
-            debugLog << "WRITE: addr=$" << std::hex << address << std::dec 
-                     << " value=$" << std::hex << (int)value << std::dec 
-                     << " (" << (char)value << ")\n";
-            debugLog.flush();
-        }
-        
+
         // Keyboard strobe
         if (address == 0xC010 || address == 0xC011) { 
             keyboard->strobeKeyboard(); 
@@ -69,7 +63,9 @@ const uint8_t CPU6502::instructionCycles[256] = {
         }
         
         // Disk controller I/O ($C0x0-$C0xF)
-        if (address >= 0xC080 && address <= 0xC08F) {
+        if (address >= 0xC680 && address <= 0xC68F) {
+            printf("Writing bytes to Address %x %x\n", address, value);
+
             diskController->ioWrite(address, value);
             return;
         }
