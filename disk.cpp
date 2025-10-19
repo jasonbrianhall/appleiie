@@ -124,8 +124,10 @@ bool DiskII::loadDisk(int drive, const std::string& filename) {
 }
 
 uint8_t DiskII::ioRead(uint16_t address) {
+    printf("IO Read Address Before is %x\n", address);
+
     address &= 0x0F;
-    printf("IO Read Addrss is %x\n", address);
+    printf("IO Read Address After is %x\n", address);
     switch (address) {
         case 0x0:
         case 0x1:
@@ -236,6 +238,7 @@ void DiskII::ioWrite(uint16_t address, uint8_t value) {
 uint8_t DiskII::readROM(uint16_t address) const {
     // PR#6 loads the Disk II controller ROM from $C600-$C6FF
     // Address should be in the range $C600-$C6FF
+    printf("Reading ROM %x\n", address);
     if (address >= ROM_BASE && address < ROM_BASE + ROM_SIZE) {
         return DISK_BOOT_ROM[address - ROM_BASE];
     }

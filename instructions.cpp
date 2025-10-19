@@ -23,36 +23,29 @@ const uint8_t CPU6502::instructionCycles[256] = {
 };
 
 // Memory access
-    uint8_t CPU6502::readByte(uint16_t address) {
-        // Log reads from the work buffer around $0580
-        if (address >= 0x0580 && address < 0x0600) {
-            uint8_t val = ram[address];
-            if (val >= 32 && val <= 126) {
-                debugLog << "RAM READ: addr=$" << std::hex << address << std::dec 
-                         << " value=$" << std::hex << (int)val << std::dec
-                         << " char='" << (char)val << "'\n";
-                debugLog.flush();
-            }
-        }
-        
-        // Keyboard input
-        if (address == 0xC000 || address == 0xC001) {
-            return keyboard->readKeyboard();
-        }
-        
-        // Disk controller I/O ($C0x0-$C0xF)
-        if (address >= 0xC680 && address <= 0xC68F) {
-            printf("Reading bytes from Address %x\n", address);
-            return diskController->ioRead(address);
-        }
-        
-        // Video memory reads
-        if (address >= 0x400 && address < 0x800) {
-            return video->readByte(address);
-        }
-        
-        return ram[address];
+uint8_t CPU6502::readByte(uint16_t address) {
+    // Keyboard input
+    if (address == 0xC000 || address == 0xC001) {
+        return keyboard->readKeyboard();
     }
+    
+    // Disk controller I/O ($C680-$C68F) - check this FIRST
+    if (address >= 0xC680 && address <= 0xC68F) {
+        return diskController->ioRead(address);
+    }
+    
+    // Disk II ROM ($C600-$C6FF) - broader range
+    if (address >= 0xC600 && address < 0xC700) {
+        //return diskController->readROM(address);
+    }
+    
+    // Video memory reads
+    if (address >= 0x400 && address < 0x800) {
+        return video->readByte(address);
+    }
+    
+    return ram[address];
+}
 
    void CPU6502::writeByte(uint16_t address, uint8_t value) {
 
