@@ -125,7 +125,7 @@ bool DiskII::loadDisk(int drive, const std::string& filename) {
 
 uint8_t DiskII::ioRead(uint16_t address) {
     address &= 0x0F;
-    
+    printf("IO Read Addrss is %x\n", address);
     switch (address) {
         case 0x0:
         case 0x1:
@@ -175,6 +175,7 @@ uint8_t DiskII::ioRead(uint16_t address) {
     }
     
     // Only even addresses return the latch
+    printf("Returned %x\n", ((address & 1) == 0) ? latchData : (rand() & 0xFF));
     return ((address & 1) == 0) ? latchData : (rand() & 0xFF);
 }
 
@@ -280,34 +281,48 @@ void DiskII::setDrive(int newDrive) {
 void DiskII::ioLatchC() {
     loadMode = false;
     
-    if (!writeMode && motorOn) {
+    if (!writeMode) {
         // Read mode
-        if (!diskData[currentDrive]) {
-            latchData = 0x7F;  // Invalid nibble
-            return;
-        }
-        
-        int trackNum = currPhysTrack >> 1;
-        if (trackNum >= diskTracks[currentDrive]) {
-            latchData = 0x7F;
-            return;
-        }
-        
-        uint8_t* track = diskData[currentDrive] + (trackNum * RAW_TRACK_BYTES);
-        latchData = track[currNibble];
-        
-        // Skip invalid nibbles (0x7F padding)
-        if (latchData == 0x7F) {
-            int count = RAW_TRACK_BYTES / 16;
-            do {
-                currNibble++;
-                if (currNibble >= RAW_TRACK_BYTES)
-                    currNibble = 0;
+        if (!motorOn) {
+            // Hack: fool RWTS drive spin check (usually at $BD34)
+            driveSpin = (driveSpin + 1) & 0xF;
+            if (driveSpin == 0) {
+                latchData = 0x7F;
+            }
+            // else: latchData keeps its previous value
+        } else if (diskData[currentDrive]) {
+            // Read data from disk
+            int trackNum = currPhysTrack >> 1;
+            if (trackNum >= diskTracks[currentDrive]) {
+                latchData = 0x7F;
+            } else {
+                uint8_t* track = diskData[currentDrive] + (trackNum * RAW_TRACK_BYTES);
                 latchData = track[currNibble];
-            } while (latchData == 0x7F && --count > 0);
+                
+                // Skip invalid nibbles (0x7F padding)
+                if (latchData == 0x7F) {
+                    int count = RAW_TRACK_BYTES / 16;
+                    do {
+                        currNibble++;
+                        if (currNibble >= RAW_TRACK_BYTES)
+                            currNibble = 0;
+                        latchData = track[currNibble];
+                    } while (latchData == 0x7F && --count > 0);
+                }
+            }
+        } else {
+            latchData = 0x7F;
+        }
+    } else {
+        // Write mode: store data to disk
+        int trackNum = currPhysTrack >> 1;
+        if (trackNum < diskTracks[currentDrive] && diskData[currentDrive]) {
+            uint8_t* track = diskData[currentDrive] + (trackNum * RAW_TRACK_BYTES);
+            track[currNibble] = latchData;
         }
     }
     
+    // Always increment position
     currNibble++;
     if (currNibble >= RAW_TRACK_BYTES)
         currNibble = 0;
