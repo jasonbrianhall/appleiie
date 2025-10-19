@@ -23,50 +23,66 @@ const uint8_t CPU6502::instructionCycles[256] = {
 };
 
 // Memory access
-uint8_t CPU6502::readByte(uint16_t address) {
-    // Log reads from the work buffer around $0580
-    if (address >= 0x0580 && address < 0x0600) {
-        uint8_t val = ram[address];
-        if (val >= 32 && val <= 126) {
-            debugLog << "RAM READ: addr=$" << std::hex << address << std::dec 
-                     << " value=$" << std::hex << (int)val << std::dec
-                     << " char='" << (char)val << "'\n";
+    uint8_t CPU6502::readByte(uint16_t address) {
+        // Log reads from the work buffer around $0580
+        if (address >= 0x0580 && address < 0x0600) {
+            uint8_t val = ram[address];
+            if (val >= 32 && val <= 126) {
+                debugLog << "RAM READ: addr=$" << std::hex << address << std::dec 
+                         << " value=$" << std::hex << (int)val << std::dec
+                         << " char='" << (char)val << "'\n";
+                debugLog.flush();
+            }
+        }
+        
+        // Keyboard input
+        if (address == 0xC000 || address == 0xC001) {
+            return keyboard->readKeyboard();
+        }
+        
+        // Disk controller I/O ($C0x0-$C0xF)
+        if (address >= 0xC080 && address <= 0xC08F) {
+            return diskController->ioRead(address);
+        }
+        
+        // Video memory reads
+        if (address >= 0x400 && address < 0x800) {
+            return video->readByte(address);
+        }
+        
+        return ram[address];
+    }
+
+   void CPU6502::writeByte(uint16_t address, uint8_t value) {
+        // Log only writes to the suspicious range
+        if (address >= 0x0580 && address < 0x0600) {
+            debugLog << "WRITE: addr=$" << std::hex << address << std::dec 
+                     << " value=$" << std::hex << (int)value << std::dec 
+                     << " (" << (char)value << ")\n";
             debugLog.flush();
         }
+        
+        // Keyboard strobe
+        if (address == 0xC010 || address == 0xC011) { 
+            keyboard->strobeKeyboard(); 
+            return; 
+        }
+        
+        // Disk controller I/O ($C0x0-$C0xF)
+        if (address >= 0xC080 && address <= 0xC08F) {
+            diskController->ioWrite(address, value);
+            return;
+        }
+        
+        // Video memory
+        if (address >= 0x400 && address < 0x800) { 
+            video->writeByte(address, value); 
+            return; 
+        }
+        
+        ram[address] = value;
     }
-    
-    // Keyboard input
-    if (address == 0xC000 || address == 0xC001) {
-        return keyboard->readKeyboard();
-    }
-    // Video memory reads
-    if (address >= 0x400 && address < 0x800) {
-        return video->readByte(address);
-    }
-    return ram[address];
-}
 
-void CPU6502::writeByte(uint16_t address, uint8_t value) {
-    // Log only writes to the suspicious range
-    if (address >= 0x0580 && address < 0x0600) {
-        debugLog << "WRITE: addr=$" << std::hex << address << std::dec 
-                 << " value=$" << std::hex << (int)value << std::dec 
-                 << " (" << (char)value << ")\n";
-        debugLog.flush();
-    }
-    
-    // Keyboard strobe
-    if (address == 0xC010 || address == 0xC011) { 
-        keyboard->strobeKeyboard(); 
-        return; 
-    }
-    // Video memory
-    if (address >= 0x400 && address < 0x800) { 
-        video->writeByte(address, value); 
-        return; 
-    }
-    ram[address] = value;
-}
 uint16_t CPU6502::readWord(uint16_t address) {
     return readByte(address) | (readByte(address + 1) << 8);
 }

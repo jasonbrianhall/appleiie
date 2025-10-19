@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <cstring>
 #include "ppu.h"
+#include "disk.h"
 
 class CPU6502 {
 public:
@@ -15,9 +16,17 @@ public:
 
     AppleIIVideo* video;
     AppleIIKeyboard* keyboard;
+    DiskII* diskController;
 
     bool irqRequested = false;
     bool nmiRequested = false;
+
+    // Constructor WITH disk support
+    CPU6502(AppleIIVideo* v, AppleIIKeyboard* k, DiskII* d)
+        : regA(0), regX(0), regY(0), regSP(0xFF), regPC(0xD000), regP(0x24),
+          totalCycles(0), video(v), keyboard(k), diskController(d) {
+        memset(ram, 0, sizeof(ram));
+    }
 
     enum StatusFlags {
         FLAG_CARRY = 0x01,
@@ -31,12 +40,6 @@ public:
     };
 
     static const uint8_t instructionCycles[256];
-
-    CPU6502(AppleIIVideo* v, AppleIIKeyboard* k)
-        : regA(0), regX(0), regY(0), regSP(0xFF), regPC(0xD000), regP(0x24),
-          totalCycles(0), video(v), keyboard(k) {
-        memset(ram, 0, sizeof(ram));
-    }
 
     uint8_t readByte(uint16_t address);
     void writeByte(uint16_t address, uint8_t value);

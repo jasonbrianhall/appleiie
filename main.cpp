@@ -11,6 +11,7 @@ std::ofstream debugLog;
 AppleIIVideo *g_video;
 AppleIIKeyboard *g_keyboard;
 CPU6502 *g_cpu;
+DiskII *g_disk;
 bool g_running = true;
 
 gboolean on_draw(GtkWidget *widget, cairo_t *cr, gpointer data) {
@@ -96,10 +97,11 @@ class BasicSystem {
 private:
   AppleIIVideo video;
   AppleIIKeyboard keyboard;
+  DiskII diskController;
   CPU6502 cpu;
 
 public:
-  BasicSystem() : cpu(&video, &keyboard) {}
+  BasicSystem() : cpu(&video, &keyboard, &diskController) {}
 
   bool loadROM(const std::string &filename) {
     std::ifstream file(filename, std::ios::binary);
@@ -152,40 +154,24 @@ public:
     g_video = &video;
     g_keyboard = &keyboard;
     g_cpu = &cpu;
+    g_disk = &diskController;
 
     return true;
   }
 
-  bool loadBASIC(const std::string &filename) {
-    std::ifstream file(filename, std::ios::binary);
-    if (!file.is_open()) {
-      std::cerr << "Error: Cannot open " << filename << "\n";
+  bool loadDisk(int drive, const std::string &filename) {
+    if (drive < 0 || drive >= 2) {
+      std::cerr << "Error: Invalid drive number: " << drive << "\n";
       return false;
     }
 
-    debugLog << "Loading BASIC program: " << filename << "\n";
-
-    file.seekg(0, std::ios::end);
-    size_t size = file.tellg();
-    file.seekg(0, std::ios::beg);
-
-    const uint16_t LOAD = 0x0801;
-    if (size > 0x10000 - LOAD) {
-      std::cerr << "Error: BASIC program too large\n";
-      return false;
-    }
-
-    uint8_t buffer[0x10000];
-    file.read((char *)buffer, size);
-    file.close();
-
-    for (size_t i = 0; i < size; i++) {
-      g_cpu->ram[LOAD + i] = buffer[i];
-    }
-
-    debugLog << "Loaded " << size << " bytes of BASIC at $" << std::hex << LOAD
-             << std::dec << "\n";
+    debugLog << "Loading disk " << drive << ": " << filename << "\n";
     debugLog.flush();
+
+    if (!diskController.loadDisk(drive, filename)) {
+      std::cerr << "Error: Failed to load disk: " << filename << "\n";
+      return false;
+    }
 
     return true;
   }
@@ -219,7 +205,8 @@ int main(int argc, char *argv[]) {
   BasicSystem system;
 
   if (argc < 2) {
-    std::cerr << "Usage: " << argv[0] << " <rom.bin> [basic_program.bin]\n";
+    std::cerr << "Usage: " << argv[0] << " <rom.bin> [disk_drive1.dsk] [disk_drive2.dsk]\n";
+    std::cerr << "Example: " << argv[0] << " appleii.rom dos33.dsk\n";
     return 1;
   }
 
@@ -227,9 +214,16 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
+  // Load disk images if provided
   if (argc > 2) {
-    if (!system.loadBASIC(argv[2])) {
-      return 1;
+    if (!system.loadDisk(0, argv[2])) {
+      std::cerr << "Warning: Could not load disk 1\n";
+    }
+  }
+
+  if (argc > 3) {
+    if (!system.loadDisk(1, argv[3])) {
+      std::cerr << "Warning: Could not load disk 2\n";
     }
   }
 
