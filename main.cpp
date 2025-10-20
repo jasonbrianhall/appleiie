@@ -173,64 +173,69 @@ public:
     return true;
   }
 
-  void runNCurses() {
-    initscr();
-    raw();
-    noecho();
-    keypad(stdscr, TRUE);
-    nodelay(stdscr, TRUE);
-    curs_set(0);
-    set_escdelay(0);
+void runNCurses() {
+  initscr();
+  raw();
+  noecho();
+  keypad(stdscr, TRUE);
+  nodelay(stdscr, TRUE);
+  curs_set(0);
+  set_escdelay(0);
 
-    if (has_colors()) {
-      start_color();
-      init_pair(1, COLOR_GREEN, COLOR_BLACK);
-      attron(COLOR_PAIR(1));
-    }
-
-    const uint64_t CYCLES_PER_FRAME = 20000;
-    auto lastTime = std::chrono::high_resolution_clock::now();
-    const auto FRAME_TIME = std::chrono::milliseconds(16);
-
-    while (g_running) {
-      int ch;
-      while ((ch = getch()) != ERR) {
-        if (ch == 3) { // Ctrl+C
-          g_cpu->requestIRQ();
-        } else if (ch == KEY_BACKSPACE || ch == 127 || ch == 8) {
-          g_keyboard->injectKey(0x08);
-        } else if (ch == '\n' || ch == '\r') {
-          g_keyboard->injectKey('\r');
-        } else if (ch >= 32 && ch < 127) {
-          g_keyboard->injectKey((uint8_t)ch);
-        }
-      }
-
-      for (uint64_t i = 0; i < CYCLES_PER_FRAME && g_running; i++) {
-        g_cpu->executeInstruction();
-      }
-
-      erase();
-      for (int row = 0; row < 24; row++) {
-        for (int col = 0; col < 40; col++) {
-          int idx = row * 40 + col;
-          uint8_t c = g_video->textMemory[idx];
-          if (c < 32 || c > 126) c = ' ';
-          mvaddch(row, col, c);
-        }
-      }
-      refresh();
-
-      auto now = std::chrono::high_resolution_clock::now();
-      auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - lastTime);
-      if (elapsed < FRAME_TIME) {
-        std::this_thread::sleep_for(FRAME_TIME - elapsed);
-      }
-      lastTime = std::chrono::high_resolution_clock::now();
-    }
-
-    endwin();
+  if (has_colors()) {
+    start_color();
+    init_pair(1, COLOR_GREEN, COLOR_BLACK);
+    attron(COLOR_PAIR(1));
   }
+
+  const uint64_t CYCLES_PER_FRAME = 20000;
+  auto lastTime = std::chrono::high_resolution_clock::now();
+  const auto FRAME_TIME = std::chrono::milliseconds(16);
+
+  while (g_running) {
+    int ch;
+    while ((ch = getch()) != ERR) {
+      if (ch == 3) { // Ctrl+C
+        g_cpu->requestIRQ();
+      } else if (ch == 17) { // Ctrl+Q to exit (ASCII 17)
+        g_running = false;
+        break;
+      } else if (ch == KEY_BACKSPACE || ch == 127 || ch == 8) {
+        g_keyboard->injectKey(0x08);
+      } else if (ch == '\n' || ch == '\r') {
+        g_keyboard->injectKey('\r');
+      } else if (ch >= 32 && ch < 127) {
+        g_keyboard->injectKey((uint8_t)ch);
+      }
+    }
+
+    if (!g_running) break;
+
+    for (uint64_t i = 0; i < CYCLES_PER_FRAME && g_running; i++) {
+      g_cpu->executeInstruction();
+    }
+
+    erase();
+    for (int row = 0; row < 24; row++) {
+      for (int col = 0; col < 40; col++) {
+        int idx = row * 40 + col;
+        uint8_t c = g_video->textMemory[idx];
+        if (c < 32 || c > 126) c = ' ';
+        mvaddch(row, col, c);
+      }
+    }
+    refresh();
+
+    auto now = std::chrono::high_resolution_clock::now();
+    auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - lastTime);
+    if (elapsed < FRAME_TIME) {
+      std::this_thread::sleep_for(FRAME_TIME - elapsed);
+    }
+    lastTime = std::chrono::high_resolution_clock::now();
+  }
+
+  endwin();
+}
 
   void run(int argc, char *argv[]) {
     if (g_use_ncurses) {
