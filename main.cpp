@@ -6,6 +6,7 @@
 #include <string>
 #include <thread>
 #include <ncurses.h>
+#include <unistd.h>
 
 std::ofstream debugLog;
 AppleIIVideo *g_video;
@@ -97,6 +98,7 @@ private:
   AppleIIKeyboard keyboard;
   DiskII diskController;
   CPU6502 cpu;
+  std::ifstream inputFileStream;
 
 public:
   BasicSystem() : cpu(&video, &keyboard, &diskController) {}
@@ -173,69 +175,83 @@ public:
     return true;
   }
 
-void runNCurses() {
-  initscr();
-  raw();
-  noecho();
-  keypad(stdscr, TRUE);
-  nodelay(stdscr, TRUE);
-  curs_set(0);
-  set_escdelay(0);
-
-  if (has_colors()) {
-    start_color();
-    init_pair(1, COLOR_GREEN, COLOR_BLACK);
-    attron(COLOR_PAIR(1));
+  void setInputFile(const std::string &filename) {
+    inputFileStream.open(filename);
+    if (!inputFileStream.is_open()) {
+      std::cerr << "Warning: Could not open input file: " << filename << "\n";
+    }
   }
 
-  const uint64_t CYCLES_PER_FRAME = 20000;
-  auto lastTime = std::chrono::high_resolution_clock::now();
-  const auto FRAME_TIME = std::chrono::milliseconds(16);
+  void runNCurses() {
+    initscr();
+    raw();
+    noecho();
+    keypad(stdscr, TRUE);
+    nodelay(stdscr, TRUE);
+    curs_set(0);
+    set_escdelay(0);
 
-  while (g_running) {
-    int ch;
-    while ((ch = getch()) != ERR) {
-      if (ch == 3) { // Ctrl+C
-        g_cpu->requestIRQ();
-      } else if (ch == 17) { // Ctrl+Q to exit (ASCII 17)
-        g_running = false;
-        break;
-      } else if (ch == KEY_BACKSPACE || ch == 127 || ch == 8) {
-        g_keyboard->injectKey(0x08);
-      } else if (ch == '\n' || ch == '\r') {
-        g_keyboard->injectKey('\r');
-      } else if (ch >= 32 && ch < 127) {
-        g_keyboard->injectKey((uint8_t)ch);
+    if (has_colors()) {
+      start_color();
+      init_pair(1, COLOR_GREEN, COLOR_BLACK);
+      attron(COLOR_PAIR(1));
+    }
+
+    const uint64_t CYCLES_PER_FRAME = 20000;
+    auto lastTime = std::chrono::high_resolution_clock::now();
+    const auto FRAME_TIME = std::chrono::milliseconds(16);
+
+    while (g_running) {
+      int ch;
+      while ((ch = getch()) != ERR) {
+        if (ch == 3) { // Ctrl+C
+          g_cpu->requestIRQ();
+        } else if (ch == 17) { // Ctrl+Q to exit
+          g_running = false;
+        } else if (ch == KEY_BACKSPACE || ch == 127 || ch == 8) {
+          g_keyboard->injectKey(0x08);
+        } else if (ch == '\n' || ch == '\r') {
+          g_keyboard->injectKey('\r');
+        } else if (ch >= 32 && ch < 127) {
+          g_keyboard->injectKey((uint8_t)ch);
+        }
       }
-    }
 
-    if (!g_running) break;
-
-    for (uint64_t i = 0; i < CYCLES_PER_FRAME && g_running; i++) {
-      g_cpu->executeInstruction();
-    }
-
-    erase();
-    for (int row = 0; row < 24; row++) {
-      for (int col = 0; col < 40; col++) {
-        int idx = row * 40 + col;
-        uint8_t c = g_video->textMemory[idx];
-        if (c < 32 || c > 126) c = ' ';
-        mvaddch(row, col, c);
+      // Also check for input from file
+      if (inputFileStream.is_open() && inputFileStream.peek() != EOF) {
+        ch = inputFileStream.get();
+        if (ch == '\n' || ch == '\r') {
+          g_keyboard->injectKey('\r');
+        } else if (ch >= 32 && ch < 127) {
+          g_keyboard->injectKey((uint8_t)ch);
+        }
       }
-    }
-    refresh();
 
-    auto now = std::chrono::high_resolution_clock::now();
-    auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - lastTime);
-    if (elapsed < FRAME_TIME) {
-      std::this_thread::sleep_for(FRAME_TIME - elapsed);
+      for (uint64_t i = 0; i < CYCLES_PER_FRAME && g_running; i++) {
+        g_cpu->executeInstruction();
+      }
+
+      erase();
+      for (int row = 0; row < 24; row++) {
+        for (int col = 0; col < 40; col++) {
+          int idx = row * 40 + col;
+          uint8_t c = g_video->textMemory[idx];
+          if (c < 32 || c > 126) c = ' ';
+          mvaddch(row, col, c);
+        }
+      }
+      refresh();
+
+      auto now = std::chrono::high_resolution_clock::now();
+      auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - lastTime);
+      if (elapsed < FRAME_TIME) {
+        std::this_thread::sleep_for(FRAME_TIME - elapsed);
+      }
+      lastTime = std::chrono::high_resolution_clock::now();
     }
-    lastTime = std::chrono::high_resolution_clock::now();
+
+    endwin();
   }
-
-  endwin();
-}
 
   void run(int argc, char *argv[]) {
     if (g_use_ncurses) {
@@ -245,6 +261,11 @@ void runNCurses() {
     else {
       runGTK(argc, argv);
     }
+#else
+    else {
+      // No GTK available, fall back to ncurses
+      runNCurses();
+    }
 #endif
   }
 };
@@ -252,12 +273,15 @@ void runNCurses() {
 int main(int argc, char *argv[]) {
   bool use_ncurses = false;
   int rom_idx = -1;
+  std::string input_file = "";
 
   for (int i = 1; i < argc; i++) {
     std::string arg = argv[i];
     if (arg == "-ncurses") {
       use_ncurses = true;
       g_use_ncurses = true;
+    } else if (arg == "-input" && i + 1 < argc) {
+      input_file = argv[++i];
     } else if (arg[0] != '-' && rom_idx == -1) {
       rom_idx = i;
     }
@@ -266,9 +290,9 @@ int main(int argc, char *argv[]) {
   BasicSystem system;
 
   if (rom_idx == -1) {
-    std::cerr << "Usage: " << argv[0] << " [-ncurses] <rom.bin> [disk1.dsk] [disk2.dsk]\n";
+    std::cerr << "Usage: " << argv[0] << " [-ncurses] [-input file.bas] <rom.bin> [disk1.dsk] [disk2.dsk]\n";
     std::cerr << "Example: " << argv[0] << " appleii.rom dos33.dsk\n";
-    std::cerr << "Example: " << argv[0] << " -ncurses appleii.rom dos33.dsk\n";
+    std::cerr << "Example: " << argv[0] << " -ncurses -input hello.bas appleii.rom\n";
     return 1;
   }
 
@@ -278,13 +302,17 @@ int main(int argc, char *argv[]) {
 
   for (int i = rom_idx + 1; i < argc; i++) {
     std::string arg = argv[i];
-    if (arg != "-ncurses") {
+    if (arg != "-ncurses" && arg != "-input") {
       int disk_num = i - rom_idx - 1;
       if (disk_num >= 2) break;
       if (!system.loadDisk(disk_num, arg)) {
         std::cerr << "Warning: Could not load disk " << (disk_num + 1) << "\n";
       }
     }
+  }
+
+  if (!input_file.empty()) {
+    system.setInputFile(input_file);
   }
 
   system.run(argc, argv);
