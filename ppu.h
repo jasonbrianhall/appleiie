@@ -240,7 +240,7 @@ public:
   }
 
   void checkForInput() {
-    // Input will be handled by GTK event loop
+    // Input will be handled by GTK event loop or ncurses
   }
 };
 

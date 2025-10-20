@@ -2,10 +2,10 @@
 #include <algorithm>
 #include <chrono>
 #include <fstream>
-#include <gtk/gtk.h>
 #include <iostream>
 #include <string>
 #include <thread>
+#include <ncurses.h>
 
 std::ofstream debugLog;
 AppleIIVideo *g_video;
@@ -13,6 +13,10 @@ AppleIIKeyboard *g_keyboard;
 CPU6502 *g_cpu;
 DiskII *g_disk;
 bool g_running = true;
+bool g_use_ncurses = false;
+
+#ifdef WITH_GTK
+#include <gtk/gtk.h>
 
 gboolean on_draw(GtkWidget *widget, cairo_t *cr, gpointer data) {
   g_video->initCairo(cr);
@@ -51,9 +55,6 @@ gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer data) {
   return TRUE;
 }
 
-static uint16_t lastPC = 0;
-static int sameCount = 0;
-
 gboolean cpu_tick(gpointer data) {
   const uint64_t CYCLES_PER_TICK = 20000;
   
@@ -61,11 +62,34 @@ gboolean cpu_tick(gpointer data) {
     g_cpu->executeInstruction();
   }
   
-  lastPC = g_cpu->regPC;
   gtk_widget_queue_draw((GtkWidget *)data);
   
   return g_running ? TRUE : FALSE;
 }
+
+void runGTK(int argc, char *argv[]) {
+  gtk_init(&argc, &argv);
+
+  GtkWidget *window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
+  gtk_window_set_title(GTK_WINDOW(window), "Apple II Emulator");
+  gtk_window_set_default_size(GTK_WINDOW(window), 640, 480);
+
+  GtkWidget *drawing_area = gtk_drawing_area_new();
+  gtk_container_add(GTK_CONTAINER(window), drawing_area);
+
+  g_signal_connect(drawing_area, "draw", G_CALLBACK(on_draw), NULL);
+  g_signal_connect(window, "key-press-event", G_CALLBACK(on_key_press), NULL);
+  g_signal_connect(window, "destroy", G_CALLBACK(gtk_main_quit), NULL);
+
+  gtk_widget_set_can_focus(drawing_area, TRUE);
+  gtk_widget_grab_focus(drawing_area);
+  gtk_widget_show_all(window);
+
+  g_timeout_add(16, cpu_tick, drawing_area);
+
+  gtk_main();
+}
+#endif
 
 class BasicSystem {
 private:
@@ -89,7 +113,6 @@ public:
 
     memset(cpu.ram, 0, sizeof(cpu.ram));
 
-    // Fill slot areas with RTS (0x60) to safely return from slot probes
     for (uint16_t i = 0xC100; i < 0xD000; i++) {
       cpu.ram[i] = 0x60;
     }
@@ -150,54 +173,112 @@ public:
     return true;
   }
 
+  void runNCurses() {
+    initscr();
+    raw();
+    noecho();
+    keypad(stdscr, TRUE);
+    nodelay(stdscr, TRUE);
+    curs_set(0);
+    set_escdelay(0);
+
+    if (has_colors()) {
+      start_color();
+      init_pair(1, COLOR_GREEN, COLOR_BLACK);
+      attron(COLOR_PAIR(1));
+    }
+
+    const uint64_t CYCLES_PER_FRAME = 20000;
+    auto lastTime = std::chrono::high_resolution_clock::now();
+    const auto FRAME_TIME = std::chrono::milliseconds(16);
+
+    while (g_running) {
+      int ch;
+      while ((ch = getch()) != ERR) {
+        if (ch == 3) { // Ctrl+C
+          g_cpu->requestIRQ();
+        } else if (ch == KEY_BACKSPACE || ch == 127 || ch == 8) {
+          g_keyboard->injectKey(0x08);
+        } else if (ch == '\n' || ch == '\r') {
+          g_keyboard->injectKey('\r');
+        } else if (ch >= 32 && ch < 127) {
+          g_keyboard->injectKey((uint8_t)ch);
+        }
+      }
+
+      for (uint64_t i = 0; i < CYCLES_PER_FRAME && g_running; i++) {
+        g_cpu->executeInstruction();
+      }
+
+      erase();
+      for (int row = 0; row < 24; row++) {
+        for (int col = 0; col < 40; col++) {
+          int idx = row * 40 + col;
+          uint8_t c = g_video->textMemory[idx];
+          if (c < 32 || c > 126) c = ' ';
+          mvaddch(row, col, c);
+        }
+      }
+      refresh();
+
+      auto now = std::chrono::high_resolution_clock::now();
+      auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - lastTime);
+      if (elapsed < FRAME_TIME) {
+        std::this_thread::sleep_for(FRAME_TIME - elapsed);
+      }
+      lastTime = std::chrono::high_resolution_clock::now();
+    }
+
+    endwin();
+  }
+
   void run(int argc, char *argv[]) {
-    GtkWidget *window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
-    gtk_window_set_title(GTK_WINDOW(window), "Apple II Emulator");
-    gtk_window_set_default_size(GTK_WINDOW(window), 640, 480);
-
-    GtkWidget *drawing_area = gtk_drawing_area_new();
-    gtk_container_add(GTK_CONTAINER(window), drawing_area);
-
-    g_signal_connect(drawing_area, "draw", G_CALLBACK(on_draw), NULL);
-    g_signal_connect(window, "key-press-event", G_CALLBACK(on_key_press), NULL);
-    g_signal_connect(window, "destroy", G_CALLBACK(gtk_main_quit), NULL);
-
-    gtk_widget_set_can_focus(drawing_area, TRUE);
-    gtk_widget_grab_focus(drawing_area);
-    gtk_widget_show_all(window);
-
-    // Start CPU tick timer (every 16ms ≈ 60 FPS)
-    g_timeout_add(16, cpu_tick, drawing_area);
-
-    gtk_main();
+    if (g_use_ncurses) {
+      runNCurses();
+    }
+#ifdef WITH_GTK
+    else {
+      runGTK(argc, argv);
+    }
+#endif
   }
 };
 
 int main(int argc, char *argv[]) {
-  gtk_init(&argc, &argv);
+  bool use_ncurses = false;
+  int rom_idx = -1;
 
-  BasicSystem system;
-
-  if (argc < 2) {
-    std::cerr << "Usage: " << argv[0] << " <rom.bin> [disk_drive1.dsk] [disk_drive2.dsk]\n";
-    std::cerr << "Example: " << argv[0] << " appleii.rom dos33.dsk\n";
-    return 1;
-  }
-
-  if (!system.loadROM(argv[1])) {
-    return 1;
-  }
-
-  // Load disk images if provided
-  if (argc > 2) {
-    if (!system.loadDisk(0, argv[2])) {
-      std::cerr << "Warning: Could not load disk 1\n";
+  for (int i = 1; i < argc; i++) {
+    std::string arg = argv[i];
+    if (arg == "-ncurses") {
+      use_ncurses = true;
+      g_use_ncurses = true;
+    } else if (arg[0] != '-' && rom_idx == -1) {
+      rom_idx = i;
     }
   }
 
-  if (argc > 3) {
-    if (!system.loadDisk(1, argv[3])) {
-      std::cerr << "Warning: Could not load disk 2\n";
+  BasicSystem system;
+
+  if (rom_idx == -1) {
+    std::cerr << "Usage: " << argv[0] << " [-ncurses] <rom.bin> [disk1.dsk] [disk2.dsk]\n";
+    std::cerr << "Example: " << argv[0] << " appleii.rom dos33.dsk\n";
+    std::cerr << "Example: " << argv[0] << " -ncurses appleii.rom dos33.dsk\n";
+    return 1;
+  }
+
+  if (!system.loadROM(argv[rom_idx])) {
+    return 1;
+  }
+
+  for (int i = rom_idx + 1; i < argc; i++) {
+    std::string arg = argv[i];
+    if (arg != "-ncurses") {
+      int disk_num = i - rom_idx - 1;
+      if (disk_num >= 2) break;
+      if (!system.loadDisk(disk_num, arg)) {
+        std::cerr << "Warning: Could not load disk " << (disk_num + 1) << "\n";
+      }
     }
   }
 
