@@ -56,11 +56,28 @@ gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer data) {
   return TRUE;
 }
 
+std::ifstream *g_input_file = nullptr;
+auto g_last_file_input_time = std::chrono::high_resolution_clock::now();
+const auto FILE_INPUT_DELAY = std::chrono::milliseconds(50);
+
 gboolean cpu_tick(gpointer data) {
   const uint64_t CYCLES_PER_TICK = 20000;
   
   for (uint64_t i = 0; i < CYCLES_PER_TICK && g_running; i++) {
     g_cpu->executeInstruction();
+  }
+
+  // Check for file input with delay between characters
+  auto now = std::chrono::high_resolution_clock::now();
+  if (g_input_file && g_input_file->is_open() && g_input_file->peek() != EOF &&
+      (now - g_last_file_input_time) >= FILE_INPUT_DELAY) {
+    int ch = g_input_file->get();
+    if (ch == '\n' || ch == '\r') {
+      g_keyboard->injectKey('\r');
+    } else if (ch >= 32 && ch < 127) {
+      g_keyboard->injectKey((uint8_t)ch);
+    }
+    g_last_file_input_time = now;
   }
   
   gtk_widget_queue_draw((GtkWidget *)data);
@@ -179,6 +196,8 @@ public:
     inputFileStream.open(filename);
     if (!inputFileStream.is_open()) {
       std::cerr << "Warning: Could not open input file: " << filename << "\n";
+    } else {
+      g_input_file = &inputFileStream;
     }
   }
 
@@ -225,6 +244,8 @@ public:
         } else if (ch >= 32 && ch < 127) {
           g_keyboard->injectKey((uint8_t)ch);
         }
+        // Small delay to ensure character is processed
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
       }
 
       for (uint64_t i = 0; i < CYCLES_PER_FRAME && g_running; i++) {
