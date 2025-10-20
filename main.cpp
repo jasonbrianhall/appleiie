@@ -34,6 +34,12 @@ gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer data) {
     return TRUE;
   }
 
+  if ((event->state & GDK_CONTROL_MASK) && (event->keyval == 'q' || event->keyval == 'Q')) {
+    g_running = false;
+    gtk_main_quit();
+    return TRUE;
+  }
+
   if (event->keyval == GDK_KEY_Return) {
     key = '\r';
     shouldInject = true;
@@ -89,7 +95,7 @@ void runGTK(int argc, char *argv[]) {
   gtk_init(&argc, &argv);
 
   GtkWidget *window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
-  gtk_window_set_title(GTK_WINDOW(window), "Apple II Emulator");
+  gtk_window_set_title(GTK_WINDOW(window), "Apple II Emulator (CTRL+q to exit)");
   gtk_window_set_default_size(GTK_WINDOW(window), 640, 480);
 
   GtkWidget *drawing_area = gtk_drawing_area_new();
