@@ -19,6 +19,7 @@ void AppleIIVideo::setTextMode() {
   if (currentMode != TEXT_MODE) {
     currentMode = TEXT_MODE;
     std::cout << "Video mode changed to TEXT\n";
+    std::cout.flush();
   }
 }
 
@@ -26,6 +27,7 @@ void AppleIIVideo::setLoResMode() {
   if (currentMode != LORES_MODE) {
     currentMode = LORES_MODE;
     std::cout << "Video mode changed to LO-RES\n";
+    std::cout.flush();
   }
 }
 
@@ -34,6 +36,7 @@ void AppleIIVideo::setHiResMode() {
     currentMode = HIRES_MODE;
     hiResMode = true;
     std::cout << "Video mode changed to HI-RES\n";
+    std::cout.flush();
   }
 }
 
@@ -41,19 +44,21 @@ void AppleIIVideo::setMixedMode() {
   // Mixed mode: lower 4 lines show text, rest shows graphics
   currentMode = HIRES_MODE;
   std::cout << "Video mode changed to MIXED (HI-RES with text overlay)\n";
+  std::cout.flush();
 }
 
 void AppleIIVideo::setPage2(bool page2) {
   displayPage2 = page2;
   if (currentMode == HIRES_MODE) {
     std::cout << "Hi-Res display switched to page " << (page2 ? "2" : "1") << "\n";
+    std::cout.flush();
   }
 }
 
 void AppleIIVideo::handleGraphicsSoftSwitch(uint16_t address) {
   // Apple II soft switches for graphics control
-  // $C050 - TEXT mode
-  // $C051 - GRAPHICS mode
+  // $C050 - TEXT mode OFF (read/write, toggles)
+  // $C051 - GRAPHICS mode ON (read/write, toggles)
   // $C052 - FULL SCREEN mode (no text window)
   // $C053 - MIXED mode (text window at bottom)
   // $C054 - PAGE 1 (display $2000-$3FFF for hi-res)
@@ -61,41 +66,36 @@ void AppleIIVideo::handleGraphicsSoftSwitch(uint16_t address) {
   // $C056 - LO-RES mode
   // $C057 - HI-RES mode
   
-  std::cout << "Soft switch at $" << std::hex << address << std::dec;
-  
   switch (address & 0xFF) {
-    case 0x50:  // TEXT mode
-      std::cout << " -> TEXT mode\n";
-      setTextMode();
+    case 0x50:  // TEXT mode OFF
+      std::cout << "Soft switch at $c050 -> TEXT mode\n";
       break;
-    case 0x51:  // GRAPHICS mode
-      std::cout << " -> GRAPHICS mode\n";
-      if (hiResMode) setHiResMode();
-      else setLoResMode();
+    case 0x51:  // GRAPHICS mode ON
+      std::cout << "Soft switch at $c051 -> GRAPHICS mode\n";
       break;
     case 0x52:  // FULL SCREEN
-      std::cout << " -> FULL SCREEN\n";
-      // Full screen flag (affects mixed mode rendering)
+      std::cout << "Soft switch at $c052 -> FS Mode\n";
+
       break;
     case 0x53:  // MIXED mode
-      std::cout << " -> MIXED mode\n";
+      std::cout << "Soft switch at $c053 -> MIXED mode\n";
       setMixedMode();
       break;
     case 0x54:  // PAGE 1
-      std::cout << " -> PAGE 1\n";
+      std::cout << "Soft switch at $c054 -> PAGE 1\n";
       setPage2(false);
       break;
     case 0x55:  // PAGE 2
-      std::cout << " -> PAGE 2\n";
+      std::cout << "Soft switch at $c055 -> PAGE 2\n";
       setPage2(true);
       break;
     case 0x56:  // LO-RES mode
-      std::cout << " -> LO-RES mode\n";
+      std::cout << "Soft switch at $c056 -> LO-RES mode\n";
       setLoResMode();
       hiResMode = false;
       break;
     case 0x57:  // HI-RES mode
-      std::cout << " -> HI-RES mode\n";
+      std::cout << "Soft switch at $c057 -> HI-RES mode\n";
       setHiResMode();
       hiResMode = true;
       break;
@@ -347,31 +347,40 @@ void AppleIIVideo::displayHiResMode() {
   cairo_set_source_rgb(cr, 0.0, 1.0, 0.0);  // Green monochrome display
   double pixel_size = 2.0;  // Scale up for visibility
   
-  // Iterate through each row (0-191)
-  for (int row = 0; row < HIRES_HEIGHT; row++) {
-    // Calculate address for this row
-    // Apple II hi-res: rows are stored in 3 vertical "zones"
-    // Zone 0: rows 0-63 (addresses $2000-$27FF)
-    // Zone 1: rows 64-127 (addresses $2800-$2FFF)
-    // Zone 2: rows 128-191 (addresses $3000-$37FF)
+  // Apple II hi-res memory layout (correct):
+  // Address bits: AAAAAAA BBBCCCC D
+  // A (bits 0-6): column byte (0-127, but only 0-39 used for 280 pixels)
+  // B (bits 7-9): row within 8-row block (0-7)
+  // C (bits 10-13): block within section (0-15, but only 0-2 used... actually 0-23)
+  // D (bit 14): section (0-2, for three vertical thirds)
+  // So: addr = column + (row_in_block * 128) + (block * 1024)
+  // Reverse: row_in_block = (addr >> 7) & 7, block = (addr >> 10) & 31, column = addr & 127
+  
+  for (int addr = 0; addr < 0x2000; addr++) {
+    uint8_t byte = displayBuffer[addr];
     
-    int zone = row / 64;
-    int rowInZone = row % 64;
-    uint16_t rowAddr = zone * 0x0800 + rowInZone * 128;
+    // Decode address
+    int column = addr & 0x7F;      // Bits 0-6: column (0-127)
+    int rowInBlock = (addr >> 7) & 7;   // Bits 7-9: row within 8-row block
+    int block = (addr >> 10) & 31;  // Bits 10-14: block number (0-31, but only 0-2 valid)
     
-    // Render each byte in this row
-    for (int colByte = 0; colByte < 128; colByte++) {
-      uint8_t byte = displayBuffer[rowAddr + colByte];
-      
-      // Each byte contains 7 pixels (bits 0-6)
-      for (int bit = 0; bit < 7; bit++) {
-        if (byte & (1 << bit)) {
-          double x = (colByte * 7 + bit) * pixel_size;
-          double y = row * pixel_size;
-          
-          cairo_rectangle(cr, x, y, pixel_size, pixel_size);
-          cairo_fill(cr);
-        }
+    // Calculate actual row from block and row-in-block
+    // Block structure: each block is 8 rows
+    // So row = block * 8 + rowInBlock, but blocks are organized in 3 sections of 8 blocks each
+    int row = (block * 8) + rowInBlock;
+    if (row >= HIRES_HEIGHT) continue;
+    
+    // Only render columns 0-39 (280 pixels / 7 bits per byte)
+    if (column >= 40) continue;
+    
+    // Render this byte's pixels
+    for (int bit = 0; bit < 7; bit++) {
+      if (byte & (1 << bit)) {
+        double x = (column * 7 + bit) * pixel_size;
+        double y = row * pixel_size;
+        
+        cairo_rectangle(cr, x, y, pixel_size, pixel_size);
+        cairo_fill(cr);
       }
     }
   }
