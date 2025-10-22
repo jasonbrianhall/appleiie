@@ -19,6 +19,13 @@ public:
     HIRES_MODE = 2      // 280x192 high-res graphics (monochrome)
   };
 
+  enum ScreenMode {
+    SPLITSCREEN = 0,
+    FULLSCREEN = 1
+
+  };
+
+
   // Text mode constants
   static const int TEXT_WIDTH = 40;
   static const int TEXT_HEIGHT = 24;
@@ -76,6 +83,8 @@ public:
   bool displayPage2;               // True = show page 2, False = show page 1
   bool hiResMode;                  // Mixed/hi-res mode flag
   bool pageFlip;                   // Page 2 flag (soft switch $C05F)
+  bool fullScreen;                 // Split or Fullscreen
+
   
   // Rendering
   cairo_surface_t *surface;
@@ -120,6 +129,7 @@ public:
   
   // Color utilities
   void getRGBForLoResColor(LoResColor color, double &r, double &g, double &b);
+  void setFullScreen(bool screenmode);
 };
 
 class AppleIIKeyboard {

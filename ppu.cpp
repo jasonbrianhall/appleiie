@@ -5,7 +5,7 @@
 // ========== AppleIIVideo ==========
 
 AppleIIVideo::AppleIIVideo() 
-    : currentMode(TEXT_MODE), displayPage2(false), hiResMode(false), 
+    : currentMode(TEXT_MODE), displayPage2(false), fullScreen(true), hiResMode(false), 
       pageFlip(false), surface(nullptr), cr(nullptr), cursorPos(0) {
   memset(textMemory, 0x20, sizeof(textMemory));
   memset(loResMemory, 0, sizeof(loResMemory));
@@ -55,6 +55,11 @@ void AppleIIVideo::setPage2(bool page2) {
   }
 }
 
+void AppleIIVideo::setFullScreen(bool screenmode) {
+  fullScreen=screenmode;
+}
+
+
 void AppleIIVideo::handleGraphicsSoftSwitch(uint16_t address) {
   // Apple II soft switches for graphics control
   // $C050 - Graphics Mode (read/write, toggles)
@@ -65,11 +70,10 @@ void AppleIIVideo::handleGraphicsSoftSwitch(uint16_t address) {
   // $C055 - PAGE 2 (display $4000-$5FFF for hi-res)
   // $C056 - LO-RES mode
   // $C057 - HI-RES mode
-  printf("Address is %x\n", address & 0xFF);
   switch (address & 0xFF) {
     case 0x50:  // Graphics Mode
       debugLog << "Soft switch at $c050 -> GRAPHICS mode (LO-RES)\n";
-      setLoResMode();  // FIX: Was missing!
+      setLoResMode(); 
       break;
     case 0x51:  // Text Mode
       debugLog << "Soft switch at $c051 -> TEXT mode\n";
@@ -77,11 +81,11 @@ void AppleIIVideo::handleGraphicsSoftSwitch(uint16_t address) {
       break;
     case 0x52:  // FULL SCREEN
       debugLog << "Soft switch at $c052 -> FS Mode\n";
-
+      setFullScreen(true);
       break;
     case 0x53:  // MIXED mode
       debugLog << "Soft switch at $c053 -> MIXED mode\n";
-      setMixedMode();
+      setFullScreen(false);
       break;
     case 0x54:  // PAGE 1
       debugLog << "Soft switch at $c054 -> PAGE 1\n";
@@ -92,8 +96,8 @@ void AppleIIVideo::handleGraphicsSoftSwitch(uint16_t address) {
       setPage2(true);
       break;
     case 0x56:  // LO-RES mode
-      debugLog << "Soft switch at $c056 -> HI-RES mode\n";
-      setHiResMode();
+      debugLog << "Soft switch at $c056 -> Lo-RES mode\n";
+      setLoResMode();
       hiResMode = false;
       break;
     case 0x57:  // HI-RES mode
