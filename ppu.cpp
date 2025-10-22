@@ -68,10 +68,10 @@ void AppleIIVideo::handleGraphicsSoftSwitch(uint16_t address) {
   
   switch (address & 0xFF) {
     case 0x50:  // TEXT mode OFF
-      debugLog << "Soft switch at $c050 -> TEXT mode\n";
+      debugLog << "Soft switch at $c050 -> GRAPHICS mode\n";
       break;
     case 0x51:  // GRAPHICS mode ON
-      debugLog << "Soft switch at $c051 -> GRAPHICS mode\n";
+      debugLog << "Soft switch at $c051 -> TEXT mode\n";
       break;
     case 0x52:  // FULL SCREEN
       debugLog << "Soft switch at $c052 -> FS Mode\n";
@@ -460,9 +460,9 @@ void AppleIIKeyboard::injectKey(uint8_t key) {
 
   lastKey = key | 0x80;
   keyWaiting = true;
-  debugLog << "Key injected: $" << std::hex << (int)lastKey << std::dec
+  /*debugLog << "Key injected: $" << std::hex << (int)lastKey << std::dec
            << " ('" << (char)(key & 0x7F) << "')\n";
-  debugLog.flush();
+  debugLog.flush(); */
 }
 
 void AppleIIKeyboard::checkForInput() {
