@@ -46,37 +46,59 @@ if (address >= 0xC600 && address < 0xC700) {
     }
     
     return ram[address];
-}
 
-   void CPU6502::writeByte(uint16_t address, uint8_t value) {
-
-        // Keyboard strobe
-        if (address == 0xC010 || address == 0xC011) { 
-            keyboard->strobeKeyboard(); 
-            return; 
-        }
-
-if (address >= 0xC0D0 && address <= 0xC0DF) {
-    diskController->ioWrite(address, value);
-    return;
-}
-        
-        // Disk controller I/O ($C0x0-$C0xF)
-        /*if (address >= 0xC680 && address <= 0xC68F) {
-            printf("Writing bytes to Address %x %x\n", address, value);
-
-            diskController->ioWrite(address, value);
-            return;
-        }*/
-        
-        // Video memory
-        if (address >= 0x400 && address < 0x800) { 
-            video->writeByte(address, value); 
-            return; 
-        }
-        
-        ram[address] = value;
+    // Hi-Res Page 1 reads
+    if (address >= 0x2000 && address < 0x4000) {
+        return video->readByte(address);
     }
+    
+    // Hi-Res Page 2 reads
+    if (address >= 0x4000 && address < 0x6000) {
+        return video->readByte(address);
+    }
+
+}
+
+void CPU6502::writeByte(uint16_t address, uint8_t value) {
+
+    // Keyboard strobe
+    if (address == 0xC010 || address == 0xC011) { 
+        keyboard->strobeKeyboard(); 
+        return; 
+    }
+
+    // Graphics soft switches ($C050-$C057)
+    if (address >= 0xC050 && address <= 0xC057) {
+        video->handleGraphicsSoftSwitch(address);
+        return;
+    }
+
+    // Disk controller I/O ($C0D0-$C0DF)
+    /*if (address >= 0xC0D0 && address <= 0xC0DF) {
+        diskController->ioWrite(address, value);
+        return;
+    }*/
+    
+    // Video memory (text and lo-res)
+    if (address >= 0x400 && address < 0x800) { 
+        video->writeByte(address, value); 
+        return; 
+    }
+    
+    // Hi-Res Page 1
+    if (address >= 0x2000 && address < 0x4000) {
+        video->writeByte(address, value);
+        return;
+    }
+    
+    // Hi-Res Page 2
+    if (address >= 0x4000 && address < 0x6000) {
+        video->writeByte(address, value);
+        return;
+    }
+    
+    ram[address] = value;
+}
 
 uint16_t CPU6502::readWord(uint16_t address) {
     return readByte(address) | (readByte(address + 1) << 8);
