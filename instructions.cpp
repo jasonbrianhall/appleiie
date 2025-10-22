@@ -30,23 +30,20 @@ uint8_t CPU6502::readByte(uint16_t address) {
         return keyboard->readKeyboard();
     }
     
-/*if (address >= 0xC0D0 && address <= 0xC0DF) {
-    printf("Address %x Returned %x\n", address, diskController->ioRead(address));
-    return diskController->ioRead(address);
-}
+    /*if (address >= 0xC0D0 && address <= 0xC0DF) {
+        return diskController->ioRead(address);
+    }*/
 
-// Disk II ROM ($C600-$C6FF)
-if (address >= 0xC600 && address < 0xC700) {
-    printf("Address 2 %x, Returned %x\n", address, diskController->readROM(address));
-    return diskController->readROM(address);
-} */
+    // Disk II ROM ($C600-$C6FF)
+   /*if (address >= 0xC600 && address < 0xC700) {
+        return diskController->readROM(address);
+   }*/
  
     // Video memory reads
     if (address >= 0x400 && address < 0x800) {
         return video->readByte(address);
     }
     
-    return ram[address];
 
     // Hi-Res Page 1 reads
     if (address >= 0x2000 && address < 0x4000) {
@@ -57,6 +54,9 @@ if (address >= 0xC600 && address < 0xC700) {
     if (address >= 0x4000 && address < 0x6000) {
         return video->readByte(address);
     }
+
+    return ram[address];
+
 
 }
 
@@ -77,10 +77,10 @@ void CPU6502::writeByte(uint16_t address, uint8_t value) {
     }
 
     // Disk controller I/O ($C0D0-$C0DF)
-    /*if (address >= 0xC0D0 && address <= 0xC0DF) {
+    if (address >= 0xC0D0 && address <= 0xC0DF) {
         diskController->ioWrite(address, value);
         return;
-    }*/
+    }
     
     // Video memory (text and lo-res)
     if (address >= 0x400 && address < 0x800) { 
