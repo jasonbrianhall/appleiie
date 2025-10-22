@@ -1,5 +1,6 @@
 #include "ppu.h"
 #include <cstdio>
+#include <iostream>
 
 // ========== AppleIIVideo ==========
 
@@ -17,16 +18,14 @@ AppleIIVideo::AppleIIVideo()
 void AppleIIVideo::setTextMode() {
   if (currentMode != TEXT_MODE) {
     currentMode = TEXT_MODE;
-    debugLog << "Video mode changed to TEXT\n";
-    debugLog.flush();
+    std::cout << "Video mode changed to TEXT\n";
   }
 }
 
 void AppleIIVideo::setLoResMode() {
   if (currentMode != LORES_MODE) {
     currentMode = LORES_MODE;
-    debugLog << "Video mode changed to LO-RES\n";
-    debugLog.flush();
+    std::cout << "Video mode changed to LO-RES\n";
   }
 }
 
@@ -34,23 +33,20 @@ void AppleIIVideo::setHiResMode() {
   if (currentMode != HIRES_MODE) {
     currentMode = HIRES_MODE;
     hiResMode = true;
-    debugLog << "Video mode changed to HI-RES\n";
-    debugLog.flush();
+    std::cout << "Video mode changed to HI-RES\n";
   }
 }
 
 void AppleIIVideo::setMixedMode() {
   // Mixed mode: lower 4 lines show text, rest shows graphics
   currentMode = HIRES_MODE;
-  debugLog << "Video mode changed to MIXED (HI-RES with text overlay)\n";
-  debugLog.flush();
+  std::cout << "Video mode changed to MIXED (HI-RES with text overlay)\n";
 }
 
 void AppleIIVideo::setPage2(bool page2) {
   displayPage2 = page2;
   if (currentMode == HIRES_MODE) {
-    debugLog << "Hi-Res display switched to page " << (page2 ? "2" : "1") << "\n";
-    debugLog.flush();
+    std::cout << "Hi-Res display switched to page " << (page2 ? "2" : "1") << "\n";
   }
 }
 
@@ -65,35 +61,46 @@ void AppleIIVideo::handleGraphicsSoftSwitch(uint16_t address) {
   // $C056 - LO-RES mode
   // $C057 - HI-RES mode
   
+  std::cout << "Soft switch at $" << std::hex << address << std::dec;
+  
   switch (address & 0xFF) {
     case 0x50:  // TEXT mode
+      std::cout << " -> TEXT mode\n";
       setTextMode();
       break;
     case 0x51:  // GRAPHICS mode
+      std::cout << " -> GRAPHICS mode\n";
       if (hiResMode) setHiResMode();
       else setLoResMode();
       break;
     case 0x52:  // FULL SCREEN
+      std::cout << " -> FULL SCREEN\n";
       // Full screen flag (affects mixed mode rendering)
       break;
     case 0x53:  // MIXED mode
+      std::cout << " -> MIXED mode\n";
       setMixedMode();
       break;
     case 0x54:  // PAGE 1
+      std::cout << " -> PAGE 1\n";
       setPage2(false);
       break;
     case 0x55:  // PAGE 2
+      std::cout << " -> PAGE 2\n";
       setPage2(true);
       break;
     case 0x56:  // LO-RES mode
+      std::cout << " -> LO-RES mode\n";
       setLoResMode();
       hiResMode = false;
       break;
     case 0x57:  // HI-RES mode
+      std::cout << " -> HI-RES mode\n";
       setHiResMode();
       hiResMode = true;
       break;
   }
+  std::cout.flush();
 }
 
 // ========== Text Mode Address Mapping ==========
@@ -340,24 +347,31 @@ void AppleIIVideo::displayHiResMode() {
   cairo_set_source_rgb(cr, 0.0, 1.0, 0.0);  // Green monochrome display
   double pixel_size = 2.0;  // Scale up for visibility
   
-  // Hi-res memory layout:
-  // $2000-$3FFF or $4000-$5FFF
-  // Interleaved across 8 rows at a time per 256-byte page
-  for (uint16_t addr = 0; addr < 0x2000; addr++) {
-    uint8_t byte = displayBuffer[addr];
+  // Iterate through each row (0-191)
+  for (int row = 0; row < HIRES_HEIGHT; row++) {
+    // Calculate address for this row
+    // Apple II hi-res: rows are stored in 3 vertical "zones"
+    // Zone 0: rows 0-63 (addresses $2000-$27FF)
+    // Zone 1: rows 64-127 (addresses $2800-$2FFF)
+    // Zone 2: rows 128-191 (addresses $3000-$37FF)
     
-    int row = getHiResRow(addr);
-    int col = getHiResCol(addr);
+    int zone = row / 64;
+    int rowInZone = row % 64;
+    uint16_t rowAddr = zone * 0x0800 + rowInZone * 128;
     
-    // Each byte contains 7 pixels (bits 0-6)
-    // Bit 7 is used for color shift on some apple variations, we ignore it
-    for (int bit = 0; bit < 7; bit++) {
-      if (byte & (1 << bit)) {
-        double x = (col + bit) * pixel_size;
-        double y = row * pixel_size;
-        
-        cairo_rectangle(cr, x, y, pixel_size, pixel_size);
-        cairo_fill(cr);
+    // Render each byte in this row
+    for (int colByte = 0; colByte < 128; colByte++) {
+      uint8_t byte = displayBuffer[rowAddr + colByte];
+      
+      // Each byte contains 7 pixels (bits 0-6)
+      for (int bit = 0; bit < 7; bit++) {
+        if (byte & (1 << bit)) {
+          double x = (colByte * 7 + bit) * pixel_size;
+          double y = row * pixel_size;
+          
+          cairo_rectangle(cr, x, y, pixel_size, pixel_size);
+          cairo_fill(cr);
+        }
       }
     }
   }
@@ -426,8 +440,8 @@ uint8_t AppleIIKeyboard::readKeyboard() {
 void AppleIIKeyboard::strobeKeyboard() {
   lastKey = lastKey & 0x7F;
   keyWaiting = false;
-  debugLog << "Keyboard strobe: key cleared\n";
-  debugLog.flush();
+  std::cout << "Keyboard strobe: key cleared\n";
+  std::cout.flush();
 }
 
 void AppleIIKeyboard::injectKey(uint8_t key) {
@@ -437,9 +451,9 @@ void AppleIIKeyboard::injectKey(uint8_t key) {
 
   lastKey = key | 0x80;
   keyWaiting = true;
-  debugLog << "Key injected: $" << std::hex << (int)lastKey << std::dec
+  std::cout << "Key injected: $" << std::hex << (int)lastKey << std::dec
            << " ('" << (char)(key & 0x7F) << "')\n";
-  debugLog.flush();
+  std::cout.flush();
 }
 
 void AppleIIKeyboard::checkForInput() {
