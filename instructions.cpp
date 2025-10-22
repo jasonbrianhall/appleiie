@@ -46,7 +46,7 @@ uint8_t CPU6502::readByte(uint16_t address) {
     
     if (address >= 0xC050 && address <= 0xC057) {
         video->handleGraphicsSoftSwitch(address);
-        printf("Soft Switch\n");
+        debugLog << "Soft Switch\n";
         return 0;
     }
 
@@ -254,7 +254,7 @@ void CPU6502::executeInstruction() {
     }*/
 
     if (nmiRequested) {
-        printf("NMI Requested\n");
+        debugLog << "NMI Requested\n";
         nmiRequested = false;
         pushWord(regPC);
         pushByte(regP | FLAG_UNUSED);

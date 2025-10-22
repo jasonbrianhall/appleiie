@@ -91,8 +91,8 @@ void AppleIIVideo::handleGraphicsSoftSwitch(uint16_t address) {
       break;
     case 0x56:  // LO-RES mode
       debugLog << "Soft switch at $c056 -> LO-RES mode\n";
-      setLoResMode();
-      hiResMode = false;
+      //setLoResMode();
+      //hiResMode = false;
       break;
     case 0x57:  // HI-RES mode
       debugLog << "Soft switch at $c057 -> HI-RES mode\n";

@@ -64,7 +64,7 @@ gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer data) {
 
 std::ifstream *g_input_file = nullptr;
 auto g_last_file_input_time = std::chrono::high_resolution_clock::now();
-const auto FILE_INPUT_DELAY = std::chrono::milliseconds(10);
+const auto FILE_INPUT_DELAY = std::chrono::milliseconds(50);
 
 gboolean cpu_tick(gpointer data) {
   const uint64_t CYCLES_PER_TICK = 20000;
