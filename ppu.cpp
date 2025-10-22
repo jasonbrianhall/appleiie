@@ -18,16 +18,16 @@ AppleIIVideo::AppleIIVideo()
 void AppleIIVideo::setTextMode() {
   if (currentMode != TEXT_MODE) {
     currentMode = TEXT_MODE;
-    std::cout << "Video mode changed to TEXT\n";
-    std::cout.flush();
+    debugLog << "Video mode changed to TEXT\n";
+    debugLog.flush();
   }
 }
 
 void AppleIIVideo::setLoResMode() {
   if (currentMode != LORES_MODE) {
     currentMode = LORES_MODE;
-    std::cout << "Video mode changed to LO-RES\n";
-    std::cout.flush();
+    debugLog << "Video mode changed to LO-RES\n";
+    debugLog.flush();
   }
 }
 
@@ -35,23 +35,23 @@ void AppleIIVideo::setHiResMode() {
   if (currentMode != HIRES_MODE) {
     currentMode = HIRES_MODE;
     hiResMode = true;
-    std::cout << "Video mode changed to HI-RES\n";
-    std::cout.flush();
+    debugLog << "Video mode changed to HI-RES\n";
+    debugLog.flush();
   }
 }
 
 void AppleIIVideo::setMixedMode() {
   // Mixed mode: lower 4 lines show text, rest shows graphics
   currentMode = HIRES_MODE;
-  std::cout << "Video mode changed to MIXED (HI-RES with text overlay)\n";
-  std::cout.flush();
+  debugLog << "Video mode changed to MIXED (HI-RES with text overlay)\n";
+  debugLog.flush();
 }
 
 void AppleIIVideo::setPage2(bool page2) {
   displayPage2 = page2;
   if (currentMode == HIRES_MODE) {
-    std::cout << "Hi-Res display switched to page " << (page2 ? "2" : "1") << "\n";
-    std::cout.flush();
+    debugLog << "Hi-Res display switched to page " << (page2 ? "2" : "1") << "\n";
+    debugLog.flush();
   }
 }
 
@@ -68,39 +68,39 @@ void AppleIIVideo::handleGraphicsSoftSwitch(uint16_t address) {
   
   switch (address & 0xFF) {
     case 0x50:  // TEXT mode OFF
-      std::cout << "Soft switch at $c050 -> TEXT mode\n";
+      debugLog << "Soft switch at $c050 -> TEXT mode\n";
       break;
     case 0x51:  // GRAPHICS mode ON
-      std::cout << "Soft switch at $c051 -> GRAPHICS mode\n";
+      debugLog << "Soft switch at $c051 -> GRAPHICS mode\n";
       break;
     case 0x52:  // FULL SCREEN
-      std::cout << "Soft switch at $c052 -> FS Mode\n";
+      debugLog << "Soft switch at $c052 -> FS Mode\n";
 
       break;
     case 0x53:  // MIXED mode
-      std::cout << "Soft switch at $c053 -> MIXED mode\n";
+      debugLog << "Soft switch at $c053 -> MIXED mode\n";
       setMixedMode();
       break;
     case 0x54:  // PAGE 1
-      std::cout << "Soft switch at $c054 -> PAGE 1\n";
+      debugLog << "Soft switch at $c054 -> PAGE 1\n";
       setPage2(false);
       break;
     case 0x55:  // PAGE 2
-      std::cout << "Soft switch at $c055 -> PAGE 2\n";
+      debugLog << "Soft switch at $c055 -> PAGE 2\n";
       setPage2(true);
       break;
     case 0x56:  // LO-RES mode
-      std::cout << "Soft switch at $c056 -> LO-RES mode\n";
+      debugLog << "Soft switch at $c056 -> LO-RES mode\n";
       setLoResMode();
       hiResMode = false;
       break;
     case 0x57:  // HI-RES mode
-      std::cout << "Soft switch at $c057 -> HI-RES mode\n";
+      debugLog << "Soft switch at $c057 -> HI-RES mode\n";
       setHiResMode();
       hiResMode = true;
       break;
   }
-  std::cout.flush();
+  debugLog.flush();
 }
 
 // ========== Text Mode Address Mapping ==========
@@ -449,8 +449,8 @@ uint8_t AppleIIKeyboard::readKeyboard() {
 void AppleIIKeyboard::strobeKeyboard() {
   lastKey = lastKey & 0x7F;
   keyWaiting = false;
-  std::cout << "Keyboard strobe: key cleared\n";
-  std::cout.flush();
+  debugLog << "Keyboard strobe: key cleared\n";
+  debugLog.flush();
 }
 
 void AppleIIKeyboard::injectKey(uint8_t key) {
@@ -460,9 +460,9 @@ void AppleIIKeyboard::injectKey(uint8_t key) {
 
   lastKey = key | 0x80;
   keyWaiting = true;
-  std::cout << "Key injected: $" << std::hex << (int)lastKey << std::dec
+  debugLog << "Key injected: $" << std::hex << (int)lastKey << std::dec
            << " ('" << (char)(key & 0x7F) << "')\n";
-  std::cout.flush();
+  debugLog.flush();
 }
 
 void AppleIIKeyboard::checkForInput() {

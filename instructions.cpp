@@ -75,7 +75,7 @@ void CPU6502::writeByte(uint16_t address, uint8_t value) {
 
     // Graphics soft switches ($C050-$C057)
     if (address >= 0xC050 && address <= 0xC057) {
-        std::cout << "Graphics soft switch write: address=$" << std::hex << address 
+        debugLog << "Graphics soft switch write: address=$" << std::hex << address 
                  << " (mode control)" << std::dec << "\n";
         video->handleGraphicsSoftSwitch(address);
         return;
@@ -89,8 +89,8 @@ void CPU6502::writeByte(uint16_t address, uint8_t value) {
     
     // Video memory (text and lo-res)
     if (address >= 0x400 && address < 0x800) { 
-        //std::cout << "Video memory low res" << std::endl;
-        std::cout << "Low-Res Page 1 write: address=$" << std::hex << address << " value=$" << (int)value << std::dec << "\n";
+        //debugLog << "Video memory low res" << std::endl;
+        debugLog << "Low-Res Page 1 write: address=$" << std::hex << address << " value=$" << (int)value << std::dec << "\n";
         video->writeByte(address, value); 
         return; 
     }
@@ -98,7 +98,7 @@ void CPU6502::writeByte(uint16_t address, uint8_t value) {
     // Hi-Res Page 1
     if (address >= 0x2000 && address < 0x4000) {
         static int hiResWrites = 0;
-        std::cout << "Hi-Res Page 1 write: address=$" << std::hex << address << " value=$" << (int)value << std::dec << "\n";
+        debugLog << "Hi-Res Page 1 write: address=$" << std::hex << address << " value=$" << (int)value << std::dec << "\n";
         video->writeByte(address, value);
         return;
     }
@@ -106,7 +106,7 @@ void CPU6502::writeByte(uint16_t address, uint8_t value) {
     // Hi-Res Page 2
     if (address >= 0x4000 && address < 0x6000) {
         static int hiResWrites2 = 0;
-        std::cout << "Hi-Res Page 2 write: address=$" << std::hex << address << " value=$" << (int)value << std::dec << "\n";
+        debugLog << "Hi-Res Page 2 write: address=$" << std::hex << address << " value=$" << (int)value << std::dec << "\n";
         video->writeByte(address, value);
         return;
     }
